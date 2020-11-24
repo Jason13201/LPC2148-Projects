@@ -3,3 +3,4 @@ Listings
 *.uvgui.*
 *.workspace
 *.pdsbak
+.DS_Store
