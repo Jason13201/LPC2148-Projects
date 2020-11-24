@@ -93,7 +93,7 @@ void RTC_INIT(){
 	CCR  = 0X13;
 	CCR =  0X11;
 	CIIR = 0X01;
-	SEC = 0X00;
+	SEC = 0X05;
 	MIN = 0X12;
 	HOUR = 0X06;
 	VICIntEnable = 0x00002000;
@@ -101,17 +101,64 @@ void RTC_INIT(){
 	VICVectAddr0 = (unsigned)rtc_int;
 }
 
+int tzOffset = 0;
+int tzOffsetHr = 0;
+int tzOffsetMin = 0;
 char timestring[8];
+void showTime() {
+	int ofsettedMin = (MIN + tzOffsetMin + 60) % 60;
+	int ofsettedHr = (HOUR + tzOffsetHr + 12) % 12;
+	sprintf(timestring,"%02d:%02d:%02d", ofsettedHr, ofsettedMin, SEC);
+	LCD_CMD(0x86);
+	LCD_STRING(timestring);
+}
+
+char gmtString[6];
+void showTimeZone() {
+	LCD_CMD(0xC3);
+	sprintf(gmtString, "%c%02d:%02d", tzOffset >= 0 ? '+' : '-', (tzOffset >= 0 ? tzOffset : -tzOffset ) / 2, tzOffset % 2 ? 30 : 0);
+	LCD_STRING(gmtString);
+}
+
+
 int main(void){
-	LCD_INIT(); 
+	LCD_INIT();
 	RTC_INIT();
 	LCD_STRING("Time: ");
+	showTime();
+	LCD_CMD(0xC0);
+	LCD_STRING("GMT");
+	showTimeZone();
+	IO1DIR &= ~(1 << 24);
+	IO1DIR &= ~(1 << 26);
 	while(1){
 		if(flag){
-			sprintf(timestring,"%d%d:%d%d:%d%d", HOUR/10, HOUR%10, MIN/10, MIN%10, SEC/10, SEC%10);
-			LCD_STRING(timestring);
-			LCD_CMD(0x86);
+			showTime();
 			flag=0;
+		}
+		if ((IO1PIN & (1 << 24)) == 0) {
+			tzOffset -= 1;
+			if (tzOffsetMin == 0) {
+				tzOffsetMin = 30;
+				tzOffsetHr -= 1;
+			} else {
+				tzOffsetMin = 0;
+			}
+			showTime();
+			showTimeZone();
+			delay_ms(250);
+		}
+		if ((IO1PIN & (1 << 26)) == 0) {
+			tzOffset += 1;
+			if (tzOffsetMin == 0) {
+				tzOffsetMin = 30;
+			} else {
+				tzOffsetMin = 0;
+				tzOffsetHr += 1;
+			}
+			showTime();
+			showTimeZone();
+			delay_ms(250);
 		}
   }
 }
